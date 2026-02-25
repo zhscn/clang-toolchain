@@ -56,6 +56,7 @@ cmake -G Ninja ../llvm \
   -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
   -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
   -DCLANG_DEFAULT_RTLIB=compiler-rt \
+  -DCLANG_DEFAULT_UNWINDLIB=libgcc \
   -DCLANG_DEFAULT_LINKER=lld \
   -DCOMPILER_RT_BUILD_CRT=ON \
   -DLIBCXX_ENABLE_SHARED=OFF \
@@ -91,7 +92,7 @@ Installed under: %{install_prefix}
 LLVM version: %{version}
 
 Compiled-in defaults: libc++, compiler-rt, lld.
-libunwind is available but not the default unwinder.
+Uses libgcc_s for unwinding (from system libgcc).
 Only static libraries (.a) are shipped — no extra flags needed.
 
 ## Quick usage
