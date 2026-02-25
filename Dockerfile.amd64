@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1.6
+#
+# Build Clang RPM on CentOS 7 via rpmbuild.
+# All build logic lives in clang-opt-amd64.spec.
+#
+# Requires base image built from Dockerfile.amd64-base:
+#   make base
+#
+# Usage (via Makefile):
+#   make rpm
+
+ARG BASE_IMAGE
+
+FROM ${BASE_IMAGE}
+
+RUN sed -i \
+      -e 's|^mirrorlist=|#mirrorlist=|g' \
+      -e 's|^baseurl=http://vault.centos.org|baseurl=http://archive.kernel.org/centos-vault|g' \
+      /etc/yum.repos.d/CentOS-*.repo && \
+    yum -y --disablerepo='epel*' install rpm-build rpmdevtools && \
+    yum clean all
+
+RUN rpmdev-setuptree
+
+ARG LLVM_MAJOR
+ARG LLVM_VERSION
+ARG LLVM_SRC
+COPY ${LLVM_SRC} /root/rpmbuild/SOURCES/
+COPY clang-opt-amd64.spec /root/rpmbuild/SPECS/
+
+WORKDIR /root/rpmbuild
+RUN rpmbuild \
+      --define "llvm_major ${LLVM_MAJOR}" \
+      --define "llvm_version ${LLVM_VERSION}" \
+      -ba SPECS/clang-opt-amd64.spec
+
+CMD ["bash", "-c", "ls -lh SRPMS/*.rpm RPMS/x86_64/*.rpm"]

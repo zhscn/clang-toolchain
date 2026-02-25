@@ -1,13 +1,14 @@
 # syntax=docker/dockerfile:1.6
 #
-# Base image: CentOS 7 + build tools + stage1 bootstrap Clang 21.
+# Base image: CentOS 7 + build tools + stage1 bootstrap Clang.
 # This image is built once and reused by Dockerfile for stage2 + RPM.
 #
-# Usage:
-#   docker build -t clang21-base -f Dockerfile.base .
+# Usage (via Makefile):
+#   make base
 
 ARG CENTOS_IMAGE=centos:7
-ARG LLVM_SRC=llvm-project-21.1.8.src.tar.xz
+ARG LLVM_MAJOR
+ARG LLVM_SRC
 
 ############################
 # 0) build base with deps
@@ -44,6 +45,7 @@ SHELL ["/bin/bash", "-c"]
 # 1) stage1 — bootstrap clang + libc++ with gcc/libstdc++
 ############################
 FROM base AS stage1-build
+ARG LLVM_MAJOR
 ARG LLVM_SRC
 WORKDIR /work
 COPY ${LLVM_SRC} .
@@ -55,7 +57,7 @@ WORKDIR /work/build-stage1
 RUN source /opt/rh/devtoolset-11/enable && \
     cmake -G Ninja /work/llvm-project/llvm \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=/opt/clang21-stage1 \
+      -DCMAKE_INSTALL_PREFIX=/opt/clang${LLVM_MAJOR}-stage1 \
       -DLLVM_ENABLE_PROJECTS="clang;lld" \
       -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
       -DLLVM_TARGETS_TO_BUILD="X86" \
@@ -73,4 +75,5 @@ RUN source /opt/rh/devtoolset-11/enable && \
 # 2) final base image — build deps + stage1 clang
 ############################
 FROM base
-COPY --from=stage1-build /opt/clang21-stage1 /opt/clang21-stage1
+ARG LLVM_MAJOR
+COPY --from=stage1-build /opt/clang${LLVM_MAJOR}-stage1 /opt/clang${LLVM_MAJOR}-stage1

@@ -1,0 +1,97 @@
+name: Publish stage1 base image
+
+on:
+  workflow_dispatch:
+    inputs:
+      llvm_version:
+        description: "LLVM version (e.g. 22.1.0)"
+        required: true
+        default: "22.1.0"
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  base-amd64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive LLVM variables
+        id: vars
+        run: |
+          VERSION="${{ inputs.llvm_version }}"
+          MAJOR="${VERSION%%.*}"
+          echo "llvm_major=${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "llvm_src=llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+          echo "llvm_url=https://github.com/llvm/llvm-project/releases/download/llvmorg-${VERSION}/llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+
+      - name: Download LLVM source tarball
+        run: curl -fSL -o "${{ steps.vars.outputs.llvm_src }}" "${{ steps.vars.outputs.llvm_url }}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.amd64-base
+          push: true
+          build-args: |
+            LLVM_MAJOR=${{ steps.vars.outputs.llvm_major }}
+            LLVM_SRC=${{ steps.vars.outputs.llvm_src }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/clang-base:${{ inputs.llvm_version }}-amd64
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/clang-base:latest-amd64
+
+  base-aarch64:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive LLVM variables
+        id: vars
+        run: |
+          VERSION="${{ inputs.llvm_version }}"
+          MAJOR="${VERSION%%.*}"
+          echo "llvm_major=${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "llvm_src=llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+          echo "llvm_url=https://github.com/llvm/llvm-project/releases/download/llvmorg-${VERSION}/llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+
+      - name: Download LLVM source tarball
+        run: curl -fSL -o "${{ steps.vars.outputs.llvm_src }}" "${{ steps.vars.outputs.llvm_url }}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.aarch64-base
+          push: true
+          build-args: |
+            LLVM_MAJOR=${{ steps.vars.outputs.llvm_major }}
+            LLVM_SRC=${{ steps.vars.outputs.llvm_src }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/clang-base:${{ inputs.llvm_version }}-aarch64
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/clang-base:latest-aarch64

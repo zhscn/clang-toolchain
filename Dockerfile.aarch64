@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.6
+#
+# Build Clang aarch64 RPM on CentOS 8 via rpmbuild.
+# All build logic lives in clang-opt-aarch64.spec.
+#
+# Requires base image built from Dockerfile.aarch64-base:
+#   make base
+#
+# Usage (via Makefile):
+#   make rpm
+
+ARG BASE_IMAGE
+
+FROM ${BASE_IMAGE}
+
+RUN dnf -y install rpm-build rpmdevtools && dnf clean all
+
+RUN rpmdev-setuptree
+
+ARG LLVM_MAJOR
+ARG LLVM_VERSION
+ARG LLVM_SRC
+COPY ${LLVM_SRC} /root/rpmbuild/SOURCES/
+COPY clang-opt-aarch64.spec /root/rpmbuild/SPECS/
+
+WORKDIR /root/rpmbuild
+RUN rpmbuild \
+      --define "llvm_major ${LLVM_MAJOR}" \
+      --define "llvm_version ${LLVM_VERSION}" \
+      -ba SPECS/clang-opt-aarch64.spec
+
+CMD ["bash", "-c", "ls -lh SRPMS/*.rpm RPMS/aarch64/*.rpm"]

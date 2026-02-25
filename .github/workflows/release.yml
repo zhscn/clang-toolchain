@@ -1,0 +1,120 @@
+name: Build RPMs on release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+  BASE_IMAGE: ghcr.io/${{ github.repository_owner }}/clang-base
+
+jobs:
+  rpm-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse version from tag
+        id: vars
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          MAJOR="${VERSION%%.*}"
+          # Base image version comes from Makefile default, not the release tag
+          BASE_VERSION=$(sed -n 's/^LLVM_VERSION *?= *//p' Makefile)
+          echo "llvm_version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "llvm_major=${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "llvm_src=llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+          echo "llvm_url=https://github.com/llvm/llvm-project/releases/download/llvmorg-${VERSION}/llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+          echo "base_version=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download LLVM source tarball
+        run: curl -fSL -o "${{ steps.vars.outputs.llvm_src }}" "${{ steps.vars.outputs.llvm_url }}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull base image
+        run: docker pull "${{ env.BASE_IMAGE }}:${{ steps.vars.outputs.base_version }}-amd64"
+
+      - name: Build RPM image
+        run: |
+          docker build -t rpm-amd64 \
+            --build-arg BASE_IMAGE="${{ env.BASE_IMAGE }}:${{ steps.vars.outputs.base_version }}-amd64" \
+            --build-arg LLVM_MAJOR="${{ steps.vars.outputs.llvm_major }}" \
+            --build-arg LLVM_VERSION="${{ steps.vars.outputs.llvm_version }}" \
+            --build-arg LLVM_SRC="${{ steps.vars.outputs.llvm_src }}" \
+            -f Dockerfile.amd64 .
+
+      - name: Extract RPMs
+        run: |
+          mkdir -p out
+          docker run --rm -v "$PWD/out:/out" rpm-amd64 \
+            bash -c 'cp /root/rpmbuild/SRPMS/*.rpm /root/rpmbuild/RPMS/x86_64/*.rpm /out/'
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" out/*.rpm
+
+  rpm-aarch64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse version from tag
+        id: vars
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          MAJOR="${VERSION%%.*}"
+          # Base image version comes from Makefile default, not the release tag
+          BASE_VERSION=$(sed -n 's/^LLVM_VERSION *?= *//p' Makefile)
+          echo "llvm_version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "llvm_major=${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "llvm_src=llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+          echo "llvm_url=https://github.com/llvm/llvm-project/releases/download/llvmorg-${VERSION}/llvm-project-${VERSION}.src.tar.xz" >> "$GITHUB_OUTPUT"
+          echo "base_version=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download LLVM source tarball
+        run: curl -fSL -o "${{ steps.vars.outputs.llvm_src }}" "${{ steps.vars.outputs.llvm_url }}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull base image
+        run: docker pull "${{ env.BASE_IMAGE }}:${{ steps.vars.outputs.base_version }}-aarch64"
+
+      - name: Build RPM image
+        run: |
+          docker build -t rpm-aarch64 \
+            --build-arg BASE_IMAGE="${{ env.BASE_IMAGE }}:${{ steps.vars.outputs.base_version }}-aarch64" \
+            --build-arg LLVM_MAJOR="${{ steps.vars.outputs.llvm_major }}" \
+            --build-arg LLVM_VERSION="${{ steps.vars.outputs.llvm_version }}" \
+            --build-arg LLVM_SRC="${{ steps.vars.outputs.llvm_src }}" \
+            -f Dockerfile.aarch64 .
+
+      - name: Extract RPMs
+        run: |
+          mkdir -p out
+          docker run --rm -v "$PWD/out:/out" rpm-aarch64 \
+            bash -c 'cp /root/rpmbuild/SRPMS/*.rpm /root/rpmbuild/RPMS/aarch64/*.rpm /out/'
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" out/*.rpm
