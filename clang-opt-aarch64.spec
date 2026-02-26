@@ -15,12 +15,13 @@ Source0:        llvm-project-%{version}.src.tar.xz
 ExclusiveArch:  aarch64
 
 # cmake >= 3.20 and ninja installed outside rpm (binary tarballs)
-# Stage1 clang required at stage1_prefix (from earlier Docker stage)
+# Stage1 clang required at %{stage1_prefix} (from base image)
 BuildRequires:  gcc-toolset-11-gcc-c++
 BuildRequires:  zlib-devel
 BuildRequires:  libxml2-devel
 
 Requires:       glibc-devel
+Requires:       gcc
 Requires:       libgcc
 Requires:       zlib
 Requires:       libxml2
@@ -37,7 +38,10 @@ Compiled-in defaults: libc++, compiler-rt, lld.
 source /opt/rh/gcc-toolset-11/enable
 export CC=%{stage1_prefix}/bin/clang
 export CXX=%{stage1_prefix}/bin/clang++
+export LDFLAGS="-Wl,--build-id"
 
+# Step 1: Build LLVM + Clang + LLD + runtimes (sanitizers off — libc++ must
+#         exist before compiler-rt can detect target support)
 mkdir -p _build && cd _build
 cmake -G Ninja ../llvm \
   -DCMAKE_BUILD_TYPE=Release \
@@ -51,23 +55,42 @@ cmake -G Ninja ../llvm \
   -DLLVM_INCLUDE_EXAMPLES=OFF \
   -DLLVM_INCLUDE_BENCHMARKS=OFF \
   -DLLVM_ENABLE_LLD=ON \
-  -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--build-id" \
-  -DCMAKE_EXE_LINKER_FLAGS="-Wl,--build-id" \
   -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
   -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
   -DCLANG_DEFAULT_RTLIB=compiler-rt \
   -DCLANG_DEFAULT_UNWINDLIB=libgcc \
   -DCLANG_DEFAULT_LINKER=lld \
   -DCOMPILER_RT_BUILD_CRT=ON \
+  -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
   -DLIBCXX_ENABLE_SHARED=OFF \
+  -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON \
   -DLIBCXXABI_ENABLE_SHARED=OFF \
-  -DLIBUNWIND_ENABLE_SHARED=OFF \
-  -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON
+  -DLIBUNWIND_ENABLE_SHARED=OFF
+
+ninja
+
+# Step 2: Build compiler-rt sanitizers standalone (libc++.a now available)
+cd ..
+mkdir -p _build-rt && cd _build-rt
+cmake -G Ninja ../compiler-rt \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=%{install_prefix}/lib/clang/%{llvm_major} \
+  -DCMAKE_C_COMPILER=%{_builddir}/llvm-project-%{version}.src/_build/bin/clang \
+  -DCMAKE_CXX_COMPILER=%{_builddir}/llvm-project-%{version}.src/_build/bin/clang++ \
+  -DCMAKE_C_COMPILER_TARGET=aarch64-unknown-linux-gnu \
+  -DCMAKE_CXX_COMPILER_TARGET=aarch64-unknown-linux-gnu \
+  -DCOMPILER_RT_BUILD_BUILTINS=OFF \
+  -DCOMPILER_RT_BUILD_CRT=OFF \
+  -DCOMPILER_RT_BUILD_SANITIZERS=ON \
+  -DCOMPILER_RT_INCLUDE_TESTS=OFF \
+  -DLLVM_CONFIG_PATH=%{_builddir}/llvm-project-%{version}.src/_build/bin/llvm-config
 
 ninja
 
 %install
 cd _build
+DESTDIR=%{buildroot} ninja install
+cd ../_build-rt
 DESTDIR=%{buildroot} ninja install
 
 # Fix ambiguous python shebangs (CentOS 8 brp-mangle-shebangs rejects "#!/usr/bin/env python")

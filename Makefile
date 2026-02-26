@@ -29,7 +29,7 @@ RPM_IMAGE             ?= clang$(LLVM_MAJOR)-$(ARCH)-rpm
 
 .PHONY: all base rpm extract clean
 
-all: extract
+all: base extract
 
 $(LLVM_SRC):
 	curl -fSL -o $@ $(LLVM_URL)
@@ -40,7 +40,7 @@ base: $(LLVM_SRC)
 	  --build-arg LLVM_SRC=$(LLVM_SRC) \
 	  .
 
-rpm: base
+rpm:
 	docker build -t $(RPM_IMAGE) -f $(DOCKERFILE_RPM) \
 	  --build-arg BASE_IMAGE=$(BASE_IMAGE) \
 	  --build-arg LLVM_MAJOR=$(LLVM_MAJOR) \
