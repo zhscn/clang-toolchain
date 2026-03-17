@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.6
+#
+# Build Clang 19 RPM on CentOS 8 using clang22 stage1 as bootstrap (aarch64).
+#
+# Requires clang22 base image (has stage1 clang at /opt/clang22-stage1):
+#   make base LLVM_VERSION=22.1.0 ARCH=aarch64
+#
+# Usage:
+#   curl -fSL -o llvm-project-19.1.7.src.tar.xz \
+#     https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/llvm-project-19.1.7.src.tar.xz
+#   docker build -t clang19-aarch64-rpm -f Dockerfile.clang19-aarch64 \
+#     --build-arg BASE_IMAGE=clang22-aarch64-base \
+#     --build-arg LLVM_MAJOR=19 \
+#     --build-arg LLVM_VERSION=19.1.7 \
+#     --build-arg LLVM_SRC=llvm-project-19.1.7.src.tar.xz .
+#   docker run --rm -v "$PWD/out:/out" clang19-aarch64-rpm \
+#     bash -c 'cp /root/rpmbuild/SRPMS/*.rpm /root/rpmbuild/RPMS/aarch64/*.rpm /out/'
+
+ARG BASE_IMAGE=clang22-aarch64-base
+
+FROM ${BASE_IMAGE}
+
+RUN dnf -y install rpm-build rpmdevtools && dnf clean all
+
+RUN rpmdev-setuptree
+
+ARG LLVM_MAJOR=19
+ARG LLVM_VERSION=19.1.7
+ARG LLVM_SRC=llvm-project-19.1.7.src.tar.xz
+COPY ${LLVM_SRC} /root/rpmbuild/SOURCES/
+COPY clang19-opt-aarch64.spec /root/rpmbuild/SPECS/
+
+WORKDIR /root/rpmbuild
+RUN rpmbuild \
+      --define "llvm_major ${LLVM_MAJOR}" \
+      --define "llvm_version ${LLVM_VERSION}" \
+      -ba SPECS/clang19-opt-aarch64.spec
+
+CMD ["bash", "-c", "ls -lh SRPMS/*.rpm RPMS/aarch64/*.rpm"]

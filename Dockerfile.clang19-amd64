@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1.6
+#
+# Build Clang 19 RPM on CentOS 7 using clang22 stage1 as bootstrap.
+#
+# Requires clang22 base image (has stage1 clang at /opt/clang22-stage1):
+#   make base LLVM_VERSION=22.1.0
+#
+# Usage:
+#   curl -fSL -o llvm-project-19.1.7.src.tar.xz \
+#     https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/llvm-project-19.1.7.src.tar.xz
+#   docker build -t clang19-amd64-rpm -f Dockerfile.clang19-amd64 \
+#     --build-arg BASE_IMAGE=clang22-amd64-base \
+#     --build-arg LLVM_MAJOR=19 \
+#     --build-arg LLVM_VERSION=19.1.7 \
+#     --build-arg LLVM_SRC=llvm-project-19.1.7.src.tar.xz .
+#   docker run --rm -v "$PWD/out:/out" clang19-amd64-rpm \
+#     bash -c 'cp /root/rpmbuild/SRPMS/*.rpm /root/rpmbuild/RPMS/x86_64/*.rpm /out/'
+
+ARG BASE_IMAGE=clang22-amd64-base
+
+FROM ${BASE_IMAGE}
+
+RUN sed -i \
+      -e 's|^mirrorlist=|#mirrorlist=|g' \
+      -e 's|^baseurl=http://vault.centos.org|baseurl=http://archive.kernel.org/centos-vault|g' \
+      /etc/yum.repos.d/CentOS-*.repo && \
+    yum -y --disablerepo='epel*' install rpm-build rpmdevtools && \
+    yum clean all
+
+RUN rpmdev-setuptree
+
+ARG LLVM_MAJOR=19
+ARG LLVM_VERSION=19.1.7
+ARG LLVM_SRC=llvm-project-19.1.7.src.tar.xz
+COPY ${LLVM_SRC} /root/rpmbuild/SOURCES/
+COPY clang19-opt-amd64.spec /root/rpmbuild/SPECS/
+
+WORKDIR /root/rpmbuild
+RUN rpmbuild \
+      --define "llvm_major ${LLVM_MAJOR}" \
+      --define "llvm_version ${LLVM_VERSION}" \
+      -ba SPECS/clang19-opt-amd64.spec
+
+CMD ["bash", "-c", "ls -lh SRPMS/*.rpm RPMS/x86_64/*.rpm"]
