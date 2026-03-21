@@ -8,6 +8,8 @@ SHELL ["/bin/bash", "-lc"]
 RUN sed -i 's/^mirrorlist=/#mirrorlist=/' /etc/yum.repos.d/CentOS-*.repo && \
     sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' /etc/yum.repos.d/CentOS-*.repo && \
     yum install -y centos-release-scl-rh centos-release-scl epel-release && \
+    sed -i 's/^mirrorlist=/#mirrorlist=/' /etc/yum.repos.d/*.repo && \
+    sed -i 's|^# *baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' /etc/yum.repos.d/*.repo && \
     yum install -y \
       bzip2 \
       ca-certificates \
@@ -28,8 +30,11 @@ RUN sed -i 's/^mirrorlist=/#mirrorlist=/' /etc/yum.repos.d/CentOS-*.repo && \
       ncurses-devel \
       devtoolset-11-binutils \
       devtoolset-11-gcc \
-      devtoolset-11-gcc-c++ && \
-    curl -fsSL -o /tmp/cmake.tgz "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz" && \
+      devtoolset-11-gcc-c++
+
+ENV PATH=/opt/rh/devtoolset-11/root/usr/bin:$PATH
+
+RUN curl -fsSL -o /tmp/cmake.tgz "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz" && \
     tar -C /opt -xzf /tmp/cmake.tgz && \
     ln -sf "/opt/cmake-${CMAKE_VERSION}-linux-x86_64/bin/cmake" /usr/local/bin/cmake && \
     ln -sf "/opt/cmake-${CMAKE_VERSION}-linux-x86_64/bin/ctest" /usr/local/bin/ctest && \
