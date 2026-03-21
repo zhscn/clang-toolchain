@@ -1,0 +1,98 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      llvm_version:
+        description: 'LLVM version to build (e.g. 21.1.8)'
+        required: true
+      compiler_version:
+        description: 'Existing clang-toolchain release to build with (e.g. 21.1.6)'
+        required: true
+
+env:
+  LLVM_MAJOR: '21'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+            dockerfile: bootstrap/centos7-x86_64.Dockerfile
+            llvm_target: X86
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            dockerfile: bootstrap/rocky8-aarch64.Dockerfile
+            llvm_target: AArch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download LLVM source
+        run: |
+          curl -fsSL -o llvm-project.tar.xz \
+            "https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ inputs.llvm_version }}/llvm-project-${{ inputs.llvm_version }}.src.tar.xz"
+
+      - name: Download compiler RPM
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v${{ inputs.compiler_version }}" \
+            --pattern "clang-toolchain-*.${{ matrix.arch }}.rpm" \
+            --dir compiler-rpm
+
+      - name: Build Docker image
+        run: docker build -t builder -f ${{ matrix.dockerfile }} .
+
+      - name: Build RPM
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -e LLVM_VERSION="${{ inputs.llvm_version }}" \
+            -e LLVM_MAJOR="${{ env.LLVM_MAJOR }}" \
+            builder bash -lc '
+              set -euo pipefail
+              mkdir -p /work/out
+
+              rpm -ivh --nodeps /work/compiler-rpm/*.rpm
+
+              rpmdev-setuptree
+              cp /work/llvm-project.tar.xz ~/rpmbuild/SOURCES/llvm-project-${LLVM_VERSION}.src.tar.xz
+              cp /work/rpm/clang-toolchain.spec ~/rpmbuild/SPECS/
+
+              rpmbuild -ba ~/rpmbuild/SPECS/clang-toolchain.spec \
+                --define "llvm_major ${LLVM_MAJOR}" \
+                --define "llvm_version ${LLVM_VERSION}"
+
+              cp ~/rpmbuild/RPMS/*/*.rpm /work/out/
+              cp ~/rpmbuild/SRPMS/*.rpm /work/out/ || true
+            '
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms-${{ matrix.arch }}
+          path: out/*.rpm
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Publish to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG="v${{ inputs.llvm_version }}"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "$TAG" --notes "LLVM ${{ inputs.llvm_version }} toolchain (x86_64 + aarch64)"
+          gh release upload "$TAG" out/*.rpm --clobber
