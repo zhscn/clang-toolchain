@@ -57,7 +57,6 @@ cmake -G Ninja ../llvm \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi" \
   -DLLVM_TARGETS_TO_BUILD="%{llvm_target}" \
-  -DLLVM_ENABLE_TERMINFO=OFF \
   -DLLVM_ENABLE_LIBXML2=OFF \
   -DLLVM_ENABLE_ZLIB=ON \
   -DLLVM_ENABLE_ASSERTIONS=OFF \
