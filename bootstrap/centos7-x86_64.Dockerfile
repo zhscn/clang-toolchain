@@ -26,8 +26,6 @@ RUN sed -i 's/^mirrorlist=/#mirrorlist=/' /etc/yum.repos.d/CentOS-*.repo && \
       which \
       xz \
       zlib-devel \
-      libxml2-devel \
-      ncurses-devel \
       devtoolset-11-binutils \
       devtoolset-11-gcc \
       devtoolset-11-gcc-c++

@@ -78,12 +78,11 @@ docker run --network host --rm \
     cp /work/llvm-project.tar.xz ~/rpmbuild/SOURCES/llvm-project-${LLVM_VERSION}.src.tar.xz
     cp /work/bootstrap/clang-toolchain.spec ~/rpmbuild/SPECS/
 
-    rpmbuild -ba ~/rpmbuild/SPECS/clang-toolchain.spec \
+    rpmbuild -bb ~/rpmbuild/SPECS/clang-toolchain.spec \
       --define "llvm_major ${LLVM_MAJOR}" \
       --define "llvm_version ${LLVM_VERSION}"
 
     cp ~/rpmbuild/RPMS/*/*.rpm /work/out/
-    cp ~/rpmbuild/SRPMS/*.rpm /work/out/ || true
   '
 
 echo "==> Done. RPMs in out/"

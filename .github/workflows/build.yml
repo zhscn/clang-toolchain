@@ -21,11 +21,9 @@ jobs:
           - arch: x86_64
             runner: ubuntu-latest
             dockerfile: bootstrap/centos7-x86_64.Dockerfile
-            llvm_target: X86
           - arch: aarch64
             runner: ubuntu-24.04-arm
             dockerfile: bootstrap/rocky8-aarch64.Dockerfile
-            llvm_target: AArch64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4

@@ -22,8 +22,6 @@ RUN dnf install -y epel-release && \
       which \
       xz \
       zlib-devel \
-      libxml2-devel \
-      ncurses-devel \
       gcc-toolset-12-binutils \
       gcc-toolset-12-gcc \
       gcc-toolset-12-gcc-c++
