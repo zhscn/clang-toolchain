@@ -38,7 +38,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download "v${{ inputs.compiler_version }}" \
-            --pattern "clang-toolchain-${{ env.LLVM_MAJOR }}-*.${{ matrix.arch }}.rpm" \
+            --pattern "clang-toolchain-*.${{ matrix.arch }}.rpm" \
             --dir compiler-rpm
 
       - name: Build Docker image
@@ -62,7 +62,9 @@ jobs:
 
               rpmbuild -bb ~/rpmbuild/SPECS/clang-toolchain.spec \
                 --define "llvm_major ${LLVM_MAJOR}" \
-                --define "llvm_version ${LLVM_VERSION}"
+                --define "llvm_version ${LLVM_VERSION}" \
+                --define "_binary_filedigest_algorithm 8" \
+                --define "_source_filedigest_algorithm 8"
 
               cp ~/rpmbuild/RPMS/*/*.rpm /work/out/
             '

@@ -80,7 +80,9 @@ docker run --network host --rm \
 
     rpmbuild -bb ~/rpmbuild/SPECS/clang-toolchain.spec \
       --define "llvm_major ${LLVM_MAJOR}" \
-      --define "llvm_version ${LLVM_VERSION}"
+      --define "llvm_version ${LLVM_VERSION}" \
+      --define "_binary_filedigest_algorithm 8" \
+      --define "_source_filedigest_algorithm 8"
 
     cp ~/rpmbuild/RPMS/*/*.rpm /work/out/
   '
