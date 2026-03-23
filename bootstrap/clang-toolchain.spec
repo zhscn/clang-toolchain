@@ -21,9 +21,6 @@
 %global _find_debuginfo_dwz_opts %{nil}
 %global __python %{_bindir}/python3
 
-# Use SHA256 digests so the RPM verifies on newer systems (RHEL 8+, Fedora)
-%define _binary_filedigest_algorithm 8
-%define _source_filedigest_algorithm 8
 
 Name:           clang-toolchain-%{llvm_major}
 Version:        %{llvm_version}

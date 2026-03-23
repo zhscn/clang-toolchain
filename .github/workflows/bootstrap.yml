@@ -17,7 +17,7 @@ jobs:
         include:
           - arch: x86_64
             runner: ubuntu-latest
-            dockerfile: bootstrap/centos7-x86_64.Dockerfile
+            dockerfile: bootstrap/rocky8-x86_64.Dockerfile
             llvm_target: X86
           - arch: aarch64
             runner: ubuntu-24.04-arm
@@ -86,9 +86,7 @@ jobs:
 
               rpmbuild -bb ~/rpmbuild/SPECS/clang-toolchain.spec \
                 --define "llvm_major ${LLVM_MAJOR}" \
-                --define "llvm_version ${LLVM_VERSION}" \
-                --define "_binary_filedigest_algorithm 8" \
-                --define "_source_filedigest_algorithm 8"
+                --define "llvm_version ${LLVM_VERSION}"
 
               cp ~/rpmbuild/RPMS/*/*.rpm /work/out/
             '

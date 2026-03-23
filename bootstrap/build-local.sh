@@ -8,7 +8,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 ARCH="$(uname -m)"
 
 case "$ARCH" in
-  x86_64)  DOCKERFILE="centos7-x86_64.Dockerfile"; LLVM_TARGET="X86" ;;
+  x86_64)  DOCKERFILE="rocky8-x86_64.Dockerfile"; LLVM_TARGET="X86" ;;
   aarch64|arm64) DOCKERFILE="rocky8-aarch64.Dockerfile"; LLVM_TARGET="AArch64" ;;
   *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
@@ -80,9 +80,7 @@ docker run --network host --rm \
 
     rpmbuild -bb ~/rpmbuild/SPECS/clang-toolchain.spec \
       --define "llvm_major ${LLVM_MAJOR}" \
-      --define "llvm_version ${LLVM_VERSION}" \
-      --define "_binary_filedigest_algorithm 8" \
-      --define "_source_filedigest_algorithm 8"
+      --define "llvm_version ${LLVM_VERSION}"
 
     cp ~/rpmbuild/RPMS/*/*.rpm /work/out/
   '
