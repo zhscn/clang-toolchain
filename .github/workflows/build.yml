@@ -38,7 +38,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download "v${{ inputs.compiler_version }}" \
-            --pattern "clang-toolchain-*.${{ matrix.arch }}.rpm" \
+            --pattern "clang-toolchain-${{ env.LLVM_MAJOR }}-*.${{ matrix.arch }}.rpm" \
             --dir compiler-rpm
 
       - name: Build Docker image

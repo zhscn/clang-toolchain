@@ -1,7 +1,10 @@
 %{!?llvm_major: %define llvm_major 21}
 %{!?llvm_version: %define llvm_version 21.1.8}
 %{!?release: %define release 1%{?dist}}
-%{!?install_prefix: %define install_prefix /opt/clang}
+%{!?install_prefix: %define install_prefix /opt/clang%{llvm_major}}
+
+# alternatives priority: major version * 100 (e.g. 2100 for clang 21)
+%define alternatives_priority %(echo $(( %{llvm_major} * 100 )))
 
 %ifarch x86_64
 %define llvm_target X86
@@ -17,7 +20,11 @@
 %global _find_debuginfo_dwz_opts %{nil}
 %global __python %{_bindir}/python3
 
-Name:           clang-toolchain
+# Use SHA256 digests so the RPM verifies on newer systems (RHEL 8+, Fedora)
+%define _binary_filedigest_algorithm 8
+%define _source_filedigest_algorithm 8
+
+Name:           clang-toolchain-%{llvm_major}
 Version:        %{llvm_version}
 Release:        %{release}
 Summary:        Self-hosted LLVM/Clang %{llvm_major} toolchain
@@ -32,6 +39,8 @@ BuildRequires:  python3
 Requires:       glibc
 Requires:       libgcc
 Requires:       zlib
+Requires(post): alternatives
+Requires(postun): alternatives
 
 %description
 Self-hosted Clang toolchain installed under %{install_prefix}.
@@ -168,6 +177,31 @@ CMake:
     cmake -S . -B build \
       -DCMAKE_TOOLCHAIN_FILE=%{install_prefix}/toolchains/clang.cmake
 EOF
+
+%post
+alternatives --install %{_bindir}/clang clang %{install_prefix}/bin/clang %{alternatives_priority} \
+  --slave %{_bindir}/clang++ clang++ %{install_prefix}/bin/clang++ \
+  --slave %{_bindir}/clang-cpp clang-cpp %{install_prefix}/bin/clang-cpp \
+  --slave %{_bindir}/clang-cl clang-cl %{install_prefix}/bin/clang-cl \
+  --slave %{_bindir}/lld lld %{install_prefix}/bin/lld \
+  --slave %{_bindir}/ld.lld ld.lld %{install_prefix}/bin/ld.lld \
+  --slave %{_bindir}/llvm-ar llvm-ar %{install_prefix}/bin/llvm-ar \
+  --slave %{_bindir}/llvm-nm llvm-nm %{install_prefix}/bin/llvm-nm \
+  --slave %{_bindir}/llvm-ranlib llvm-ranlib %{install_prefix}/bin/llvm-ranlib \
+  --slave %{_bindir}/llvm-objcopy llvm-objcopy %{install_prefix}/bin/llvm-objcopy \
+  --slave %{_bindir}/llvm-objdump llvm-objdump %{install_prefix}/bin/llvm-objdump \
+  --slave %{_bindir}/llvm-strip llvm-strip %{install_prefix}/bin/llvm-strip \
+  --slave %{_bindir}/llvm-readelf llvm-readelf %{install_prefix}/bin/llvm-readelf \
+  --slave %{_bindir}/llvm-readobj llvm-readobj %{install_prefix}/bin/llvm-readobj \
+  --slave %{_bindir}/llvm-symbolizer llvm-symbolizer %{install_prefix}/bin/llvm-symbolizer \
+  --slave %{_bindir}/llvm-profdata llvm-profdata %{install_prefix}/bin/llvm-profdata \
+  --slave %{_bindir}/llvm-cov llvm-cov %{install_prefix}/bin/llvm-cov \
+  --slave %{_bindir}/llvm-config llvm-config %{install_prefix}/bin/llvm-config
+
+%postun
+if [ $1 -eq 0 ]; then
+  alternatives --remove clang %{install_prefix}/bin/clang
+fi
 
 %files
 %{install_prefix}
