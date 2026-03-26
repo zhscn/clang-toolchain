@@ -131,9 +131,11 @@ ln -s %{install_prefix}/include/%{target_triple}/c++/v1/__config_site \
       %{buildroot}%{install_prefix}/include/c++/v1/__config_site
 
 find %{buildroot}%{install_prefix} -type f -executable -exec \
-  sed -i '1s|^#!/usr/bin/env python$|#!/usr/bin/env python3|' {} +
+  sed -i -e '1s|^#!/usr/bin/env python$|#!/usr/bin/env python3|' \
+         -e '1s|^#!/usr/libexec/platform-python$|#!/usr/bin/env python3|' {} +
 find %{buildroot}%{install_prefix} -type f -name '*.py' -exec \
-  sed -i '1s|^#!/usr/bin/env python$|#!/usr/bin/env python3|' {} +
+  sed -i -e '1s|^#!/usr/bin/env python$|#!/usr/bin/env python3|' \
+         -e '1s|^#!/usr/libexec/platform-python$|#!/usr/bin/env python3|' {} +
 
 mkdir -p %{buildroot}%{install_prefix}/toolchains
 cat > %{buildroot}%{install_prefix}/toolchains/clang.cmake <<'EOF'
