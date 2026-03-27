@@ -19,6 +19,7 @@
 %global debug_package %{nil}
 %global _find_debuginfo_dwz_opts %{nil}
 %global __python %{_bindir}/python3
+%global __requires_exclude ^/usr/libexec/platform-python$
 
 
 Name:           clang-toolchain-%{llvm_major}
