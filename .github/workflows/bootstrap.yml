@@ -97,8 +97,82 @@ jobs:
           name: rpms-${{ matrix.arch }}
           path: out/*.rpm
 
+  bootstrap-el7:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download LLVM source
+        run: |
+          curl -fsSL -o llvm-project.tar.xz \
+            "https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ inputs.llvm_version }}/llvm-project-${{ inputs.llvm_version }}.src.tar.xz"
+
+      - name: Build Docker image
+        run: docker build -t builder-el7 -f bootstrap/centos7-x86_64.Dockerfile .
+
+      - name: Create stage0 volume
+        run: docker volume create clang-stage0
+
+      - name: Build stage0 (GCC bootstrap)
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -v "clang-stage0:/opt/clang-stage0" \
+            -e LLVM_VERSION="${{ inputs.llvm_version }}" \
+            -e LLVM_MAJOR="${{ env.LLVM_MAJOR }}" \
+            builder-el7 bash -lc '
+              set -euo pipefail
+              INSTALL_PREFIX=/opt/clang-stage0
+
+              tar -xf /work/llvm-project.tar.xz
+              cd llvm-project-${LLVM_VERSION}.src
+
+              mkdir build-stage0 && cd build-stage0
+              cmake -G Ninja ../llvm \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
+                -DLLVM_ENABLE_PROJECTS="clang;lld" \
+                -DLLVM_TARGETS_TO_BUILD="X86" \
+                -DLLVM_ENABLE_ZLIB=ON \
+                -DLLVM_ENABLE_ASSERTIONS=OFF \
+                -DLLVM_INCLUDE_TESTS=OFF \
+                -DLLVM_INCLUDE_EXAMPLES=OFF \
+                -DLLVM_INCLUDE_BENCHMARKS=OFF
+
+              ninja
+              ninja install
+            '
+
+      - name: Build RPM (stage1)
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -v "clang-stage0:/opt/clang-stage0" \
+            -e LLVM_VERSION="${{ inputs.llvm_version }}" \
+            -e LLVM_MAJOR="${{ env.LLVM_MAJOR }}" \
+            builder-el7 bash -lc '
+              set -euo pipefail
+              mkdir -p /work/out
+
+              rpmdev-setuptree
+              cp /work/llvm-project.tar.xz ~/rpmbuild/SOURCES/llvm-project-${LLVM_VERSION}.src.tar.xz
+              cp /work/bootstrap/clang-toolchain.spec ~/rpmbuild/SPECS/
+
+              rpmbuild -bb ~/rpmbuild/SPECS/clang-toolchain.spec \
+                --define "llvm_major ${LLVM_MAJOR}" \
+                --define "llvm_version ${LLVM_VERSION}"
+
+              cp ~/rpmbuild/RPMS/*/*.rpm /work/out/
+            '
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms-el7
+          path: out/*.rpm
+
   release:
-    needs: build
+    needs: [build, bootstrap-el7]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -115,5 +189,5 @@ jobs:
         run: |
           TAG="v${{ inputs.llvm_version }}"
           gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --title "$TAG" --notes "LLVM ${{ inputs.llvm_version }} toolchain (x86_64 + aarch64)"
+            gh release create "$TAG" --title "$TAG" --notes "LLVM ${{ inputs.llvm_version }} toolchain (x86_64 + aarch64 + el7)"
           gh release upload "$TAG" out/*.rpm --clobber
